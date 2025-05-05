@@ -1,0 +1,183 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Emulator</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+        #terminal {
+            background-color: #000;
+            border: 2px solid #333;
+            border-radius: 5px;
+            height: 80vh;
+            padding: 15px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #555 #222;
+        }
+        #terminal::-webkit-scrollbar {
+            width: 8px;
+        }
+        #terminal::-webkit-scrollbar-track {
+            background: #222;
+        }
+        #terminal::-webkit-scrollbar-thumb {
+            background: #555;
+        }
+        .prompt {
+            display: flex;
+            align-items: center;
+        }
+        .prompt span {
+            color: #00ff00;
+            margin-right: 5px;
+        }
+        #input {
+            background: none;
+            border: none;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            outline: none;
+            flex-grow: 1;
+        }
+        .output {
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .output a {
+            color: #00ccff;
+            text-decoration: none;
+        }
+        .output a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal">
+        <div class="output">Welcome to Terminal Emulator v1.0<br>Type 'help' for a list of commands.</div>
+        <div class="prompt">
+            <span>$</span>
+            <input type="text" id="input" autofocus>
+        </div>
+    </div>
+    <script>
+        const terminal = document.getElementById('terminal');
+        const input = document.getElementById('input');
+
+        const commands = {
+            help: () => `Available commands:
+  help - Show this message
+  clear - Clear the terminal
+  echo [text] - Display text
+  date - Show current date
+  whoami - Display user info
+  bio - Show personal bio
+  socials - Show social media links`,
+            clear: () => {
+                terminal.innerHTML = '<div class="prompt"><span>$</span><input type="text" id="input" autofocus></div>';
+                input.removeEventListener('keydown', handleInput);
+                setTimeout(() => {
+                    const newInput = document.getElementById('input');
+                    newInput.focus();
+                    newInput.addEventListener('keydown', handleInput);
+                }, 0);
+                return '';
+            },
+            echo: (args) => args.join(' '),
+            date: () => new Date().toString(),
+            whoami: () => 'guest@terminal-emulator',
+            bio: () => `About Me:
+  Experienced Senior Electrical Engineer with over 35 years in refining ,manufacturing, marine and power plants industries, specialized in operating, maintaining, and repairing power systems, including high-voltage equipment and automation, as well as ensuring safety and reliability in technological processes. Renovation, renewing and modernization of equipment (generators, transformers, electric motors etc) taking into account current dimensions and energy consuming that leading to a 100% improvement in energy plant efficiency.
+
+ Skilled in ETAP, analysis of existing projects (systems), correction of initial errors of existing projects (systems) taking into account modern technologies and components, optimization of existing production technologies. Repair and maintenance. 
+
+I am eager to bring my experience and knowledge to a forward-thinking company where I can contribute to meaningful projects and drive impactful results.`,
+            socials: () => `Connect with me:
+  LinkedIn: <a href="https://www.linkedin.com/in/viktor-tarabunin-9a409a327/" target="_blank">https://www.linkedin.com/in/viktor-tarabunin-9a409a327/</a>`
+        };
+
+        function handleInput(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const value = input.value.trim();
+                input.value = '';
+                if (value) {
+                    const outputDiv = document.createElement('div');
+                    outputDiv.className = 'output';
+                    outputDiv.innerHTML = `<span>$</span> ${value}`;
+                    terminal.insertBefore(outputDiv, terminal.lastElementChild);
+
+                    const [cmd, ...args] = value.split(' ');
+                    let output = '';
+                    if (commands[cmd.toLowerCase()]) {
+                        output = commands[cmd.toLowerCase()](args);
+                    } else {
+                        output = `Command not found: ${cmd}`;
+                    }
+                    if (output) {
+                        const resultDiv = document.createElement('div');
+                        resultDiv.className = 'output';
+                        resultDiv.innerHTML = output;
+                        terminal.insertBefore(resultDiv, terminal.lastElementChild);
+                    }
+                    terminal.scrollTop = terminal.scrollHeight;
+                }
+            }
+        }
+
+        input.addEventListener('keydown', handleInput);
+
+        // Focus input on click anywhere in terminal
+        terminal.addEventListener('click', () => input.focus());
+    </script>
+</body>
+</html>
